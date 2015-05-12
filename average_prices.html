@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html>
+  <head>
+  <style>
+        #map-canvas {
+          width: 640px;
+          height: 640px;
+        }
+  </style>
+  <script src="https://maps.googleapis.com/maps/api/js?libraries=visualization&sensor=true_or_false&key=AIzaSyCGFXpg1qLpVIv72b8tTy-6xexMJWVI2Hk"></script>
+  <script src="./scripts/oms.min.js"></script>
+  <script>
+        function initialize() {
+          var mapCanvas = document.getElementById('map-canvas');
+          var mapOptions = {
+            center: new google.maps.LatLng(50.58, -126.95),
+            zoom: 4,
+            //mapTypeId: google.maps.MapTypeId.ROADMAP
+          }
+          var heatMapData = [];
+          var map = new google.maps.Map(mapCanvas, mapOptions)
+          map.data.loadGeoJson('https://maps.dev4.catalogue.libraries.coop:4433/geojson/average_prices.json');
+          map.data.loadGeoJson('https://maps.dev4.catalogue.libraries.coop:4433/geojson/econ_region.json');
+          //does not load, no javascript error, so hard to detect.  Download takes a long time because
+          //it is 160MB, so the javascript may never execute on this file, hence no error.
+          //map.data.loadGeoJson('https://maps.dev4.catalogue.libraries.coop:4433/geojson/school_dist.json');
+          var oms = new OverlappingMarkerSpiderfier(map);
+
+
+          var book_count = 0;
+          var current_library = '';
+          var old_library = '';
+          map.data.addListener('addfeature', function (e) {
+            if (e.feature.getGeometry().getType() === 'Point') {
+              old_library = current_library;
+              current_library = e.feature.getProperty('library_name0');
+
+              if (current_library == old_library) {
+                book_count++;
+              } else {
+                book_count = 0;
+              }
+
+              if (book_count < 8) {
+                var marker = new google.maps.Marker({
+                  position: e.feature.getGeometry().get(),
+                  title: e.feature.getProperty('title0'),
+                  map: map
+                });
+
+                //We are displaying this marker, so set it's
+                //zIndex high so it receives clicks
+                marker.setZIndex(100000);
+
+                var text = '';
+
+                e.feature.forEachProperty(function (data, key) {
+                  key = key.replace(/[0-9][0-9]*/, '');
+                  key = key.charAt(0).toUpperCase() + key.slice(1);
+                  text += '<strong>' + key + ':</strong> ' + data + "<br\>";
+                });
+
+                marker.desc = text;
+                var average_price_per_library = 0;
+                var average_lend_per_work = 0;
+                
+                var infowindow = new google.maps.InfoWindow();
+                infowindow.setContent(marker.desc);
+
+                google.maps.event.addListener(marker, 'click', function() {
+                  infowindow.open(map, marker);
+                });
+
+                e.feature.forEachProperty(function (data, key) {
+                  if (key == 'average_price_per_library0') {
+                    average_price_per_library = data;
+                  } else if (key == 'average_lending_per_work0') {
+                    average_lending_per_work = data;
+                  }
+                });
+ 
+                var new_weight = average_price_per_library / average_lending_per_work;
+
+                new_weight = new_weight;
+
+                var position = e.feature.getGeometry().get();
+
+                var lat = position.lat();
+
+                var lng = position.lng();
+
+                var new_heat_map_point = {location: new google.maps.LatLng(lat, lng), weight: new_weight};
+
+                heatMapData.push(new_heat_map_point);
+              }
+            } else {
+               
+              var color;
+              switch (e.feature.getProperty('OBJECTID')) {
+                case 9:
+                  color = 'red';
+                  break;
+                case 10:
+                  color = 'yellow';
+                  break;
+                case 11:
+                  color = 'orange';
+                  break;
+                case 12:
+                  color = 'green';
+                  break;
+                case 13:
+                  color = 'purple';
+                  break;
+                case 14:
+                  color = 'brown';
+                  break;
+                case 15:
+                  color = 'white';
+                  break;
+                case 16:
+                  color = 'blue';
+                  break;
+                default:
+                  color = 'blue';
+              }
+              
+              map.data.overrideStyle(e.feature, {fillColor: color});
+
+              map.data.overrideStyle(e.feature, {fillOpacity: 0.15});
+
+              alert('test');
+              if (e.feature.getProperty('OBJECTID') == 16) {
+                alert(heatMapData);
+                var heatmap = new google.maps.visualization.HeatmapLayer({
+                    data: heatMapData,
+                    dissipating: false,
+                    radius: 0.25,
+                    gradient: ['rgba(0, 0, 0, 0)', 'rgba(0, 200, 0, 1)', 'rgba(200, 200, 0, 1)',
+                               'rgba(200, 0, 0, 1)', 'rgba(255, 0, 0, 1)']
+                });
+
+                heatmap.setMap(map);
+              }
+            }
+
+          });
+        }
+
+        google.maps.event.addDomListener(window, 'load', initialize);
+
+  </script>
+  </head>
+  <body>
+    <div id="map-canvas"></div>
+  </body>
+</html>
