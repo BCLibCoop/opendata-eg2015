@@ -127,9 +127,7 @@
 
               map.data.overrideStyle(e.feature, {fillOpacity: 0.15});
 
-              alert('test');
               if (e.feature.getProperty('OBJECTID') == 16) {
-                alert(heatMapData);
                 var heatmap = new google.maps.visualization.HeatmapLayer({
                     data: heatMapData,
                     dissipating: false,
